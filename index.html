@@ -24,6 +24,12 @@
   h1{font-size:1.25rem; letter-spacing:.3px;}
   h1 .fifa{color:var(--gold);}
   .progress-label{color:var(--muted); font-size:.85rem;}
+  .sync-badge{
+    font-size:.78rem; font-weight:600; cursor:pointer; user-select:none;
+    padding:3px 9px; border:1px solid var(--line); border-radius:99px;
+    background:var(--panel); white-space:nowrap; margin-left:auto;
+  }
+  .sync-badge:hover{border-color:var(--accent2);}
   .bar{height:8px; background:var(--panel2); border-radius:99px; margin-top:10px; overflow:hidden;}
   .bar > div{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .35s ease; width:0;}
 
@@ -139,6 +145,7 @@
     <div class="title-row">
       <h1>⚽ Panini <span class="fifa">World Cup 2026</span> Tracker</h1>
       <span class="progress-label" id="progressLabel"></span>
+      <span class="sync-badge" id="syncBadge" title="Cloud sync status">○ Local only</span>
     </div>
     <div class="bar"><div id="progressBar"></div></div>
   </header>
@@ -167,6 +174,19 @@
 <div id="toast"></div>
 
 <script>
+// ============================================================
+//  CLOUD SYNC SETUP  —  edit these two lines, then re-upload.
+//  1. Sign up at https://jsonbin.io (you can use your Google login)
+//  2. Create a Bin with this content:  {"collected":[],"dupes":{},"updatedAt":0}
+//     then copy the Bin ID from the URL (the long code after /b/).
+//  3. Open API Keys and copy your MASTER KEY.
+//  4. Paste both below (keep the quotes), save, and re-upload index.html.
+//  Until you do this, the app still works but stays "Local only".
+// ============================================================
+const JSONBIN_ID  = "PASTE_YOUR_BIN_ID_HERE";
+const JSONBIN_KEY = "PASTE_YOUR_MASTER_KEY_HERE";
+// ============================================================
+
 // ---- Sticker data (from Panini_WC2026_missing_stickers.csv) ----
 const STICKERS = [
   {c:"FWC 8",  t:"FWC (Intro)",        p:"3",  n:"Host Country Emblem (USA)"},
@@ -331,12 +351,105 @@ const COUNTRY_ORDER = [...new Set(STICKERS.map(s => s.t))];
 
 // ---- State (persisted) ----
 const LS_KEY = "panini-wc2026-tracker";
-let state = {collected: [], dupes: {}};
+let state = {collected: [], dupes: {}, updatedAt: 0, syncedAt: 0};
 try {
   const saved = JSON.parse(localStorage.getItem(LS_KEY));
-  if (saved && Array.isArray(saved.collected) && typeof saved.dupes === "object") state = saved;
+  if (saved && Array.isArray(saved.collected) && typeof saved.dupes === "object"){
+    state = Object.assign({updatedAt: 0, syncedAt: 0}, saved);
+  }
 } catch(e) {}
-function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function persist(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+// Called after every user change: stamp a new version, cache locally, push to cloud.
+function save(){ state.updatedAt = Date.now(); persist(); schedulePush(); }
+
+// ---- Cloud sync (jsonbin.io) ----
+const CLOUD_ENABLED = JSONBIN_ID && JSONBIN_KEY && !/^PASTE_/.test(JSONBIN_ID) && !/^PASTE_/.test(JSONBIN_KEY);
+let syncStatus = CLOUD_ENABLED ? "syncing" : "off";
+let pushTimer = null, pushing = false, pushAgain = false, lastReconcile = 0;
+
+function snapshot(){ return {collected: state.collected, dupes: state.dupes, updatedAt: state.updatedAt}; }
+
+async function cloudRead(){
+  const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+    headers: {"X-Master-Key": JSONBIN_KEY, "X-Bin-Meta": "false"}
+  });
+  if (!r.ok) throw new Error("read " + r.status);
+  return await r.json();
+}
+async function cloudWrite(data){
+  const r = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+    method: "PUT",
+    headers: {"Content-Type": "application/json", "X-Master-Key": JSONBIN_KEY},
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error("write " + r.status);
+}
+
+function setSync(s, detail){ syncStatus = s; renderSyncBadge(detail); }
+
+function schedulePush(){
+  if (!CLOUD_ENABLED) return;
+  clearTimeout(pushTimer);
+  setSync("pending");
+  pushTimer = setTimeout(pushNow, 700);
+}
+async function pushNow(){
+  if (!CLOUD_ENABLED) return;
+  if (pushing){ pushAgain = true; return; }
+  pushing = true; setSync("syncing");
+  try {
+    await cloudWrite(snapshot());
+    state.syncedAt = state.updatedAt; persist();
+    setSync("ok");
+  } catch(e){
+    setSync("error", e.message);
+  } finally {
+    pushing = false;
+    if (pushAgain){ pushAgain = false; schedulePush(); }
+  }
+}
+// Pull remote and reconcile by version (last-write-wins on the whole document).
+async function reconcile(){
+  if (!CLOUD_ENABLED) return;
+  lastReconcile = Date.now();
+  setSync("syncing");
+  try {
+    const remote = await cloudRead();
+    const rU = remote && typeof remote.updatedAt === "number" ? remote.updatedAt : 0;
+    const lU = state.updatedAt || 0;
+    if (rU > lU){
+      state.collected = Array.isArray(remote.collected) ? remote.collected : [];
+      state.dupes = (remote.dupes && typeof remote.dupes === "object") ? remote.dupes : {};
+      state.updatedAt = rU; state.syncedAt = rU; persist();
+      render();
+      setSync("ok");
+    } else if (lU > rU){
+      await pushNow();
+    } else {
+      setSync("ok");
+    }
+  } catch(e){
+    setSync("error", e.message);
+  }
+}
+
+function renderSyncBadge(detail){
+  const el = document.getElementById("syncBadge");
+  if (!el) return;
+  const map = {
+    off:     ["○ Local only",  "var(--muted)"],
+    pending: ["⟳ Saving…",     "var(--muted)"],
+    syncing: ["⟳ Syncing…",    "var(--accent2)"],
+    ok:      ["☁ Synced",      "var(--accent)"],
+    error:   ["⚠ Sync error",  "var(--danger)"],
+  };
+  const [txt, color] = map[syncStatus] || map.off;
+  el.textContent = txt;
+  el.style.color = color;
+  el.title = syncStatus === "off"
+    ? "Cloud sync not set up — edit JSONBIN_ID / JSONBIN_KEY in the file"
+    : (detail ? "Sync: " + detail + " (tap to retry)" : "Cloud sync — tap to sync now");
+}
 
 let view = "missing";
 let countryFilter = "ALL";
@@ -564,7 +677,15 @@ $("#searchClear").addEventListener("click", () => {
   query = ""; $("#search").value = ""; render(); $("#search").focus();
 });
 
+// Cloud sync: manual re-sync on badge tap, auto reconcile when tab regains focus.
+$("#syncBadge").addEventListener("click", () => { if (CLOUD_ENABLED) reconcile(); });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && CLOUD_ENABLED && Date.now() - lastReconcile > 5000) reconcile();
+});
+
 render();
+renderSyncBadge();
+if (CLOUD_ENABLED) reconcile();
 </script>
 </body>
 </html>
