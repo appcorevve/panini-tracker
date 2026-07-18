@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panini WC 2026 — Sticker Tracker</title>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#161f30; --panel2:#1d2942; --line:#28364f;
+    --text:#e8edf6; --muted:#8fa0ba; --accent:#2ec27e; --accent2:#4d8dff;
+    --danger:#e05b5b; --gold:#e8b93c; --radius:12px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:820px; margin:0 auto; padding:16px 14px 90px;}
+
+  header{padding:6px 0 14px;}
+  .title-row{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  h1{font-size:1.25rem; letter-spacing:.3px;}
+  h1 .fifa{color:var(--gold);}
+  .progress-label{color:var(--muted); font-size:.85rem;}
+  .bar{height:8px; background:var(--panel2); border-radius:99px; margin-top:10px; overflow:hidden;}
+  .bar > div{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .35s ease; width:0;}
+
+  .search-row{position:sticky; top:0; z-index:20; background:var(--bg); padding:8px 0 10px;}
+  .search-box{position:relative;}
+  .search-box input{
+    width:100%; padding:12px 40px 12px 40px; font-size:1rem;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    color:var(--text); outline:none;
+  }
+  .search-box input:focus{border-color:var(--accent2);}
+  .search-box .icon{position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;}
+  .search-box .clear{
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer;
+    padding:6px 8px; border-radius:8px; display:none;
+  }
+  .search-box .clear:hover{color:var(--text);}
+
+  .view-tabs{display:flex; gap:6px; margin:4px 0 12px;}
+  .view-tabs button{
+    flex:1; padding:10px 6px; font-size:.92rem; font-weight:600;
+    background:var(--panel); color:var(--muted);
+    border:1px solid var(--line); border-radius:10px; cursor:pointer;
+  }
+  .view-tabs button.active{background:var(--panel2); color:var(--text); border-color:var(--accent2);}
+  .view-tabs button .cnt{font-weight:400; opacity:.75; font-size:.82rem;}
+
+  .chips{display:flex; gap:6px; overflow-x:auto; padding:2px 0 10px; scrollbar-width:thin;}
+  .chips::-webkit-scrollbar{height:5px;}
+  .chips::-webkit-scrollbar-thumb{background:var(--line); border-radius:99px;}
+  .chip{
+    flex:0 0 auto; padding:7px 12px; font-size:.85rem; white-space:nowrap;
+    background:var(--panel); color:var(--muted);
+    border:1px solid var(--line); border-radius:99px; cursor:pointer;
+  }
+  .chip.active{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+  .chip .n{opacity:.7; font-size:.78rem;}
+
+  .group-title{
+    margin:16px 2px 8px; font-size:.8rem; font-weight:700; letter-spacing:.8px;
+    text-transform:uppercase; color:var(--muted);
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    display:flex; align-items:center; gap:12px; padding:10px 12px; margin-bottom:8px;
+  }
+  .code-badge{
+    flex:0 0 auto; min-width:64px; text-align:center;
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:7px 8px; font-weight:700; font-size:.85rem; letter-spacing:.5px;
+  }
+  .card .info{flex:1; min-width:0;}
+  .card .name{font-size:.95rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .card .meta{font-size:.78rem; color:var(--muted); margin-top:2px;}
+  .btn{
+    flex:0 0 auto; border:none; border-radius:10px; cursor:pointer;
+    font-size:.88rem; font-weight:700; padding:10px 14px;
+  }
+  .btn-got{background:var(--accent); color:#08301d;}
+  .btn-got:active{transform:scale(.96);}
+  .btn-undo{background:var(--panel2); color:var(--text); border:1px solid var(--line);}
+  .btn-sm{padding:7px 11px; font-size:.85rem;}
+  .qty-btn{
+    width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:var(--panel2); color:var(--text); font-size:1.05rem; font-weight:700; cursor:pointer;
+  }
+  .qty{min-width:26px; text-align:center; font-weight:700;}
+  .del-btn{background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.05rem; padding:6px;}
+  .del-btn:hover{color:var(--danger);}
+
+  .empty{
+    text-align:center; color:var(--muted); padding:40px 16px; font-size:.95rem;
+    border:1px dashed var(--line); border-radius:var(--radius); margin-top:12px;
+  }
+  .empty .big{font-size:2rem; display:block; margin-bottom:8px;}
+
+  .dupe-add{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px; margin-bottom:14px;
+  }
+  .dupe-add label{display:block; font-size:.85rem; color:var(--muted); margin-bottom:8px;}
+  .dupe-add .row{display:flex; gap:8px;}
+  .dupe-add input{
+    flex:1; padding:11px 12px; font-size:1rem; background:var(--panel2);
+    border:1px solid var(--line); border-radius:10px; color:var(--text); outline:none;
+    text-transform:uppercase;
+  }
+  .dupe-add input:focus{border-color:var(--accent2);}
+  .dupe-add .add{background:var(--accent2); color:#fff;}
+  .dupe-msg{font-size:.82rem; margin-top:8px; min-height:1em;}
+  .dupe-msg.ok{color:var(--accent);}
+  .dupe-msg.err{color:var(--danger);}
+  .dupe-total{color:var(--muted); font-size:.85rem; margin:0 2px 10px;}
+
+  #toast{
+    position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(80px);
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    padding:10px 14px; border-radius:12px; display:flex; gap:12px; align-items:center;
+    box-shadow:0 8px 24px rgba(0,0,0,.45); transition:transform .25s ease; z-index:50;
+    max-width:92vw; font-size:.9rem;
+  }
+  #toast.show{transform:translateX(-50%) translateY(0);}
+  #toast button{background:none; border:none; color:var(--accent2); font-weight:700; cursor:pointer; font-size:.9rem;}
+
+  footer{margin-top:28px; text-align:center; color:var(--muted); font-size:.78rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>⚽ Panini <span class="fifa">World Cup 2026</span> Tracker</h1>
+      <span class="progress-label" id="progressLabel"></span>
+    </div>
+    <div class="bar"><div id="progressBar"></div></div>
+  </header>
+
+  <div class="search-row">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="search" id="search" placeholder="Search player, country or code…" autocomplete="off">
+      <button class="clear" id="searchClear" title="Clear">✕</button>
+    </div>
+  </div>
+
+  <div class="view-tabs">
+    <button data-view="missing" class="active">Missing <span class="cnt" id="cntMissing"></span></button>
+    <button data-view="dupes">Duplicates <span class="cnt" id="cntDupes"></span></button>
+    <button data-view="collected">Collected <span class="cnt" id="cntCollected"></span></button>
+  </div>
+
+  <div id="chipBar" class="chips"></div>
+
+  <main id="content"></main>
+
+  <footer>Data saved in this browser (localStorage). 156 stickers on the missing list at start.</footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ---- Sticker data (from Panini_WC2026_missing_stickers.csv) ----
+const STICKERS = [
+  {c:"FWC 8",  t:"FWC (Intro)",        p:"3",  n:"Host Country Emblem (USA)"},
+  {c:"MEX 7",  t:"Mexico",             p:"8",  n:"Israel Reyes"},
+  {c:"MEX 20", t:"Mexico",             p:"9",  n:"Cesar Huerta"},
+  {c:"RSA 5",  t:"South Africa",       p:"10", n:"Samukele Kabini"},
+  {c:"RSA 9",  t:"South Africa",       p:"10", n:"Khuliso Mudau"},
+  {c:"RSA 14", t:"South Africa",       p:"11", n:"Bathusi Aubaas"},
+  {c:"RSA 19", t:"South Africa",       p:"11", n:"Mohau Nkota"},
+  {c:"KOR 2",  t:"Korea Republic",     p:"12", n:"Hyeonwoo Jo"},
+  {c:"KOR 4",  t:"Korea Republic",     p:"12", n:"Minjae Kim"},
+  {c:"KOR 7",  t:"Korea Republic",     p:"12", n:"Hanbeom Lee"},
+  {c:"KOR 8",  t:"Korea Republic",     p:"12", n:"Taeseok Lee"},
+  {c:"KOR 10", t:"Korea Republic",     p:"12", n:"Jaesung Lee"},
+  {c:"CZE 6",  t:"Czechia",            p:"14", n:"Jaroslav Zeleny"},
+  {c:"CZE 18", t:"Czechia",            p:"15", n:"Vaclav Cerny"},
+  {c:"CZE 19", t:"Czechia",            p:"15", n:"Adam Hlozek"},
+  {c:"CAN 6",  t:"Canada",             p:"16", n:"Richie Laryea"},
+  {c:"CAN 12", t:"Canada",             p:"17", n:"Jonathan Osorio"},
+  {c:"CAN 17", t:"Canada",             p:"17", n:"Tajon Buchanan"},
+  {c:"BIH 16", t:"Bosnia-Herzegovina", p:"19", n:"Amar Memic"},
+  {c:"QAT 12", t:"Qatar",              p:"21", n:"Hamed Fatehi"},
+  {c:"QAT 13", t:"Qatar",              p:"21", n:"Team photo (We Are Qatar)"},
+  {c:"SUI 5",  t:"Switzerland",        p:"22", n:"Ricardo Rodriguez"},
+  {c:"SUI 17", t:"Switzerland",        p:"23", n:"Breel Embolo"},
+  {c:"BRA 1",  t:"Brazil",             p:"24", n:"Team emblem"},
+  {c:"BRA 8",  t:"Brazil",             p:"24", n:"Wesley"},
+  {c:"BRA 19", t:"Brazil",             p:"25", n:"Raphinha"},
+  {c:"MAR 4",  t:"Morocco",            p:"26", n:"Achraf Hakimi"},
+  {c:"MAR 7",  t:"Morocco",            p:"26", n:"Romain Saiss"},
+  {c:"MAR 9",  t:"Morocco",            p:"26", n:"Adam Masina"},
+  {c:"MAR 15", t:"Morocco",            p:"27", n:"Ismael Saibari"},
+  {c:"HAI 2",  t:"Haiti",              p:"28", n:"Johny Placide"},
+  {c:"HAI 11", t:"Haiti",              p:"29", n:"Danley Jean Jacques"},
+  {c:"HAI 13", t:"Haiti",              p:"29", n:"Team photo (We Are Haiti)"},
+  {c:"HAI 15", t:"Haiti",              p:"29", n:"Derrick Etienne Jr."},
+  {c:"HAI 18", t:"Haiti",              p:"29", n:"Duckens Nazon"},
+  {c:"HAI 20", t:"Haiti",              p:"29", n:"Frantzdy Pierrot"},
+  {c:"USA 9",  t:"USA",                p:"32", n:"Tanner Tessmann"},
+  {c:"USA 15", t:"USA",                p:"33", n:"Malik Tillman"},
+  {c:"USA 16", t:"USA",                p:"33", n:"Christian Pulisic"},
+  {c:"PAR 16", t:"Paraguay",           p:"35", n:"Alejandro Romero Gamarra"},
+  {c:"AUS 5",  t:"Australia",          p:"36", n:"Alessandro Circati"},
+  {c:"AUS 6",  t:"Australia",          p:"36", n:"Jordan Bos"},
+  {c:"AUS 16", t:"Australia",          p:"37", n:"Patrick Yazbek"},
+  {c:"GER 3",  t:"Germany",            p:"40", n:"Jonathan Tah"},
+  {c:"GER 4",  t:"Germany",            p:"40", n:"David Raum"},
+  {c:"GER 5",  t:"Germany",            p:"40", n:"Nico Schlotterbeck"},
+  {c:"GER 13", t:"Germany",            p:"41", n:"Team photo (We Are Germany)"},
+  {c:"GER 15", t:"Germany",            p:"41", n:"Jamal Musiala"},
+  {c:"CUW 6",  t:"Curacao",            p:"42", n:"Joshua Brenet"},
+  {c:"CUW 15", t:"Curacao",            p:"43", n:"Kenji Gorre"},
+  {c:"CUW 18", t:"Curacao",            p:"43", n:"Jeremy Antonisse"},
+  {c:"CUW 20", t:"Curacao",            p:"43", n:"Sontje Hansen"},
+  {c:"CIV 5",  t:"Cote d'Ivoire",      p:"44", n:"Odilon Kossounou"},
+  {c:"CIV 9",  t:"Cote d'Ivoire",      p:"44", n:"Ousmane Diomande"},
+  {c:"CIV 10", t:"Cote d'Ivoire",      p:"44", n:"Franck Kessie"},
+  {c:"CIV 11", t:"Cote d'Ivoire",      p:"45", n:"Seko Fofana"},
+  {c:"CIV 12", t:"Cote d'Ivoire",      p:"45", n:"Ibrahim Sangare"},
+  {c:"CIV 17", t:"Cote d'Ivoire",      p:"45", n:"Simon Adingra"},
+  {c:"ECU 7",  t:"Ecuador",            p:"46", n:"Angelo Preciado"},
+  {c:"ECU 8",  t:"Ecuador",            p:"46", n:"Joel Ordonez"},
+  {c:"NED 6",  t:"Netherlands",        p:"48", n:"Denzel Dumfries"},
+  {c:"NED 11", t:"Netherlands",        p:"49", n:"Ryan Gravenberch"},
+  {c:"NED 17", t:"Netherlands",        p:"49", n:"Memphis Depay"},
+  {c:"JPN 4",  t:"Japan",              p:"50", n:"Ayumu Seko"},
+  {c:"JPN 5",  t:"Japan",              p:"50", n:"Junnosuke Suzuki"},
+  {c:"JPN 7",  t:"Japan",              p:"50", n:"Tsuyoshi Watanabe"},
+  {c:"JPN 10", t:"Japan",              p:"50", n:"Ao Tanaka"},
+  {c:"JPN 19", t:"Japan",              p:"51", n:"Koki Ogawa"},
+  {c:"SWE 2",  t:"Sweden",             p:"52", n:"Viktor Johansson"},
+  {c:"SWE 4",  t:"Sweden",             p:"52", n:"Gabriel Gudmundsson"},
+  {c:"SWE 5",  t:"Sweden",             p:"52", n:"Emil Holm"},
+  {c:"SWE 8",  t:"Sweden",             p:"52", n:"Lucas Bergvall"},
+  {c:"TUN 9",  t:"Tunisia",            p:"54", n:"Ellyes Skhiri"},
+  {c:"BEL 5",  t:"Belgium",            p:"58", n:"Zeno Debast"},
+  {c:"BEL 8",  t:"Belgium",            p:"58", n:"Thomas Meunier"},
+  {c:"BEL 11", t:"Belgium",            p:"59", n:"Nicolas Raskin"},
+  {c:"EGY 11", t:"Egypt",              p:"61", n:"Zizo"},
+  {c:"EGY 12", t:"Egypt",              p:"61", n:"Hamdy Fathy"},
+  {c:"EGY 20", t:"Egypt",              p:"61", n:"Omar Marmoush"},
+  {c:"IRN 2",  t:"IR Iran",            p:"62", n:"Alireza Beiranvand"},
+  {c:"IRN 10", t:"IR Iran",            p:"62", n:"Saleh Hardani"},
+  {c:"NZL 16", t:"New Zealand",        p:"65", n:"Ben Old"},
+  {c:"NZL 20", t:"New Zealand",        p:"65", n:"Kosta Barbarouses"},
+  {c:"ESP 4",  t:"Spain",              p:"66", n:"Aymeric Laporte"},
+  {c:"ESP 13", t:"Spain",              p:"67", n:"Team photo (We Are Spain)"},
+  {c:"ESP 20", t:"Spain",              p:"67", n:"Mikel Oyarzabal"},
+  {c:"CPV 1",  t:"Cabo Verde",         p:"68", n:"Team emblem"},
+  {c:"CPV 6",  t:"Cabo Verde",         p:"68", n:"Steven Moreira"},
+  {c:"CPV 8",  t:"Cabo Verde",         p:"68", n:"Joao Paulo"},
+  {c:"CPV 13", t:"Cabo Verde",         p:"69", n:"Team photo (We Are Cabo Verde)"},
+  {c:"CPV 18", t:"Cabo Verde",         p:"69", n:"Dailon Livramento"},
+  {c:"KSA 1",  t:"Saudi Arabia",       p:"70", n:"Team emblem"},
+  {c:"KSA 4",  t:"Saudi Arabia",       p:"70", n:"Saud Abdulhamid"},
+  {c:"KSA 5",  t:"Saudi Arabia",       p:"70", n:"Nawaf Buwashl"},
+  {c:"KSA 7",  t:"Saudi Arabia",       p:"70", n:"Moteb Alharbi"},
+  {c:"KSA 13", t:"Saudi Arabia",       p:"71", n:"Team photo (We Are Saudi Arabia)"},
+  {c:"KSA 17", t:"Saudi Arabia",       p:"71", n:"Abdulrahman Alobud"},
+  {c:"URU 3",  t:"Uruguay",            p:"72", n:"Santiago Mele"},
+  {c:"URU 10", t:"Uruguay",            p:"72", n:"Federico Valverde"},
+  {c:"URU 14", t:"Uruguay",            p:"73", n:"Manuel Ugarte"},
+  {c:"FRA 9",  t:"France",             p:"74", n:"Aurelien Tchouameni"},
+  {c:"FRA 10", t:"France",             p:"74", n:"Eduardo Camavinga"},
+  {c:"FRA 11", t:"France",             p:"75", n:"Manu Kone"},
+  {c:"FRA 12", t:"France",             p:"75", n:"Adrien Rabiot"},
+  {c:"SEN 1",  t:"Senegal",            p:"76", n:"Team emblem"},
+  {c:"SEN 9",  t:"Senegal",            p:"76", n:"Idrissa Gana Gueye"},
+  {c:"SEN 11", t:"Senegal",            p:"77", n:"Pape Gueye"},
+  {c:"SEN 16", t:"Senegal",            p:"77", n:"Ismaila Sarr"},
+  {c:"SEN 18", t:"Senegal",            p:"77", n:"Iliman Ndiaye"},
+  {c:"SEN 19", t:"Senegal",            p:"77", n:"Nicolas Jackson"},
+  {c:"SEN 20", t:"Senegal",            p:"77", n:"Krepin Diatta"},
+  {c:"IRQ 3",  t:"Iraq",               p:"78", n:"Rebin Sulaka"},
+  {c:"IRQ 8",  t:"Iraq",               p:"78", n:"Manaf Younis"},
+  {c:"IRQ 10", t:"Iraq",               p:"78", n:"Amir Al-Ammari"},
+  {c:"IRQ 16", t:"Iraq",               p:"79", n:"Marko Farji"},
+  {c:"IRQ 18", t:"Iraq",               p:"79", n:"Ali Al-Hamadi"},
+  {c:"NOR 6",  t:"Norway",             p:"80", n:"Marcus Holmgren Pedersen"},
+  {c:"NOR 14", t:"Norway",             p:"81", n:"Patrick Berg"},
+  {c:"NOR 19", t:"Norway",             p:"81", n:"Antonio Nusa"},
+  {c:"ARG 3",  t:"Argentina",          p:"82", n:"Nahuel Molina"},
+  {c:"ARG 13", t:"Argentina",          p:"83", n:"Team photo (We Are Argentina)"},
+  {c:"ALG 4",  t:"Algeria",            p:"84", n:"Youcef Atal"},
+  {c:"ALG 15", t:"Algeria",            p:"85", n:"Riyad Mahrez"},
+  {c:"AUT 5",  t:"Austria",            p:"86", n:"Kevin Danso"},
+  {c:"AUT 8",  t:"Austria",            p:"86", n:"Phillipp Mwene"},
+  {c:"AUT 14", t:"Austria",            p:"87", n:"Florian Grillitsch"},
+  {c:"JOR 1",  t:"Jordan",             p:"88", n:"Team emblem"},
+  {c:"JOR 6",  t:"Jordan",             p:"88", n:"Abdallah Nasib"},
+  {c:"POR 5",  t:"Portugal",           p:"90", n:"Joao Cancelo"},
+  {c:"POR 7",  t:"Portugal",           p:"90", n:"Nuno Mendes"},
+  {c:"POR 13", t:"Portugal",           p:"91", n:"Team photo (We Are Portugal)"},
+  {c:"POR 18", t:"Portugal",           p:"91", n:"Goncalo Ramos"},
+  {c:"COD 1",  t:"Congo DR",           p:"92", n:"Team emblem"},
+  {c:"COD 4",  t:"Congo DR",           p:"92", n:"Axel Tuanzebe"},
+  {c:"COD 7",  t:"Congo DR",           p:"92", n:"Joris Kayembe"},
+  {c:"COD 11", t:"Congo DR",           p:"93", n:"Samuel Moutoussamy"},
+  {c:"UZB 5",  t:"Uzbekistan",         p:"94", n:"Umar Eshmurodov"},
+  {c:"UZB 10", t:"Uzbekistan",         p:"94", n:"Odiljon Hamrobekov"},
+  {c:"ENG 2",  t:"England",            p:"98", n:"Jordan Pickford"},
+  {c:"ENG 8",  t:"England",            p:"98", n:"Dan Burn"},
+  {c:"ENG 19", t:"England",            p:"99", n:"Marcus Rashford"},
+  {c:"CRO 3",  t:"Croatia",            p:"100", n:"Duje Caleta-Car"},
+  {c:"CRO 4",  t:"Croatia",            p:"100", n:"Josko Gvardiol"},
+  {c:"CRO 14", t:"Croatia",            p:"101", n:"Mario Pasalic"},
+  {c:"GHA 6",  t:"Ghana",              p:"102", n:"Alexander Djiku"},
+  {c:"GHA 14", t:"Ghana",              p:"103", n:"Mohammed Kudus"},
+  {c:"GHA 19", t:"Ghana",              p:"103", n:"Osman Bukari"},
+  {c:"GHA 20", t:"Ghana",              p:"103", n:"Antoine Semenyo"},
+  {c:"PAN 2",  t:"Panama",             p:"104", n:"Orlando Mosquera"},
+  {c:"PAN 10", t:"Panama",             p:"104", n:"Cristian Martinez"},
+  {c:"PAN 13", t:"Panama",             p:"105", n:"Team photo (We Are Panama)"},
+  {c:"PAN 15", t:"Panama",             p:"105", n:"Carlos Harvey"},
+  {c:"PAN 17", t:"Panama",             p:"105", n:"Jose Fajardo"},
+  {c:"PAN 20", t:"Panama",             p:"105", n:"Alberto Quintero"},
+  {c:"CC 7",   t:"Coca-Cola insert",   p:"Bonus", n:"Alphonso Davies"},
+  {c:"CC 8",   t:"Coca-Cola insert",   p:"Bonus", n:"Raul Jimenez"},
+];
+const BY_CODE = Object.fromEntries(STICKERS.map(s => [s.c, s]));
+const COUNTRY_ORDER = [...new Set(STICKERS.map(s => s.t))];
+
+// ---- State (persisted) ----
+const LS_KEY = "panini-wc2026-tracker";
+let state = {collected: [], dupes: {}};
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY));
+  if (saved && Array.isArray(saved.collected) && typeof saved.dupes === "object") state = saved;
+} catch(e) {}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+let view = "missing";
+let countryFilter = "ALL";
+let query = "";
+
+// ---- Helpers ----
+const $ = sel => document.querySelector(sel);
+const esc = s => s.replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+
+function normalizeCode(raw){
+  const m = raw.trim().toUpperCase().match(/^([A-Z]{2,4})[\s\-\.]*0*(\d{1,3})$/);
+  return m ? `${m[1]} ${m[2]}` : null;
+}
+function matches(s, q){
+  if (!q) return true;
+  const nq = norm(q);
+  return norm(s.c).includes(nq) || norm(s.n).includes(nq) || norm(s.t).includes(nq);
+}
+const isCollected = c => state.collected.includes(c);
+const missingList = () => STICKERS.filter(s => !isCollected(s.c));
+const collectedList = () => state.collected.map(c => BY_CODE[c]).filter(Boolean);
+
+// ---- Toast (with undo) ----
+let toastTimer = null, undoFn = null;
+function toast(msg, undo){
+  const t = $("#toast");
+  undoFn = undo || null;
+  t.innerHTML = esc(msg) + (undo ? ' <button onclick="doUndo()">UNDO</button>' : "");
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 4000);
+}
+function doUndo(){
+  if (undoFn) undoFn();
+  undoFn = null;
+  $("#toast").classList.remove("show");
+  render();
+}
+
+// ---- Actions ----
+function collect(code){
+  if (!isCollected(code)) state.collected.push(code);
+  save(); render();
+  const s = BY_CODE[code];
+  toast(`✓ Collected ${code}${s ? " — " + s.n : ""}`, () => {
+    state.collected = state.collected.filter(c => c !== code); save();
+  });
+}
+function uncollect(code){
+  state.collected = state.collected.filter(c => c !== code);
+  save(); render();
+  toast(`${code} moved back to missing`);
+}
+function addDupes(){
+  const input = $("#dupeInput");
+  const parts = input.value.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return;
+  const added = [], bad = [];
+  for (const p of parts){
+    const code = normalizeCode(p);
+    if (code){ state.dupes[code] = (state.dupes[code] || 0) + 1; added.push(code); }
+    else bad.push(p);
+  }
+  save();
+  const msg = $("#dupeMsg");
+  if (added.length && !bad.length){
+    input.value = "";
+    msg.className = "dupe-msg ok"; msg.textContent = `Added: ${added.join(", ")}`;
+  } else if (added.length){
+    input.value = bad.join(", ");
+    msg.className = "dupe-msg err"; msg.textContent = `Added ${added.join(", ")} — didn't understand: ${bad.join(", ")}`;
+  } else {
+    msg.className = "dupe-msg err"; msg.textContent = `Couldn't read code(s): ${bad.join(", ")} (use format like MEX 02 or POR 10)`;
+  }
+  renderKeepMsg();
+  $("#dupeInput").focus();
+}
+function dupeQty(code, delta){
+  const v = (state.dupes[code] || 0) + delta;
+  if (v <= 0) delete state.dupes[code]; else state.dupes[code] = v;
+  save(); render();
+}
+function dupeRemove(code){
+  delete state.dupes[code]; save(); render();
+  toast(`Removed ${code} from duplicates`);
+}
+
+// ---- Rendering ----
+function stickerCard(s, btnHtml){
+  return `<div class="card">
+    <div class="code-badge">${esc(s.c)}</div>
+    <div class="info">
+      <div class="name">${esc(s.n)}</div>
+      <div class="meta">${esc(s.t)} · page ${esc(s.p)}</div>
+    </div>
+    ${btnHtml}
+  </div>`;
+}
+
+function renderMissing(el){
+  let list = missingList().filter(s => matches(s, query));
+  if (countryFilter !== "ALL") list = list.filter(s => s.t === countryFilter);
+  if (!list.length){
+    el.innerHTML = missingList().length === 0
+      ? `<div class="empty"><span class="big">🏆</span>Album complete — no missing stickers!</div>`
+      : `<div class="empty"><span class="big">🔍</span>No missing stickers match.</div>`;
+    return;
+  }
+  const groups = new Map();
+  for (const s of list){
+    if (!groups.has(s.t)) groups.set(s.t, []);
+    groups.get(s.t).push(s);
+  }
+  let html = "";
+  for (const t of COUNTRY_ORDER){
+    if (!groups.has(t)) continue;
+    const g = groups.get(t);
+    html += `<div class="group-title"><span>${esc(t)}</span><span>${g.length} missing</span></div>`;
+    html += g.map(s => stickerCard(s,
+      `<button class="btn btn-got" onclick="collect('${s.c}')">✓ Got it</button>`)).join("");
+  }
+  el.innerHTML = html;
+}
+
+function renderDupes(el){
+  const total = Object.values(state.dupes).reduce((a,b)=>a+b,0);
+  let html = `<div class="dupe-add">
+    <label for="dupeInput">Add duplicate sticker codes (comma-separated, e.g. <b>MEX 02, POR 10</b>)</label>
+    <div class="row">
+      <input id="dupeInput" placeholder="MEX 02, POR 10" autocomplete="off"
+             onkeydown="if(event.key==='Enter')addDupes()">
+      <button class="btn add" onclick="addDupes()">＋ Add</button>
+    </div>
+    <div id="dupeMsg" class="dupe-msg"></div>
+  </div>`;
+  const codes = Object.keys(state.dupes)
+    .filter(c => { const s = BY_CODE[c] || {c, n:"", t:"", p:""}; return matches({...s, c}, query); })
+    .sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+  if (total) html += `<div class="dupe-total">${total} duplicate sticker${total>1?"s":""} · ${Object.keys(state.dupes).length} different</div>`;
+  if (!codes.length){
+    html += `<div class="empty"><span class="big">📦</span>${total ? "No duplicates match your search." : "No duplicates yet. Add codes above."}</div>`;
+  } else {
+    html += codes.map(code => {
+      const s = BY_CODE[code];
+      const qty = state.dupes[code];
+      return `<div class="card">
+        <div class="code-badge">${esc(code)}</div>
+        <div class="info">
+          <div class="name">${s ? esc(s.n) : "—"}</div>
+          <div class="meta">${s ? esc(s.t) + " · page " + esc(s.p) : "not on your missing list"}</div>
+        </div>
+        <button class="qty-btn" onclick="dupeQty('${code}',-1)">−</button>
+        <span class="qty">${qty}</span>
+        <button class="qty-btn" onclick="dupeQty('${code}',1)">+</button>
+        <button class="del-btn" title="Remove" onclick="dupeRemove('${code}')">🗑</button>
+      </div>`;
+    }).join("");
+  }
+  el.innerHTML = html;
+}
+
+function renderCollected(el){
+  const list = collectedList().filter(s => matches(s, query));
+  if (!list.length){
+    el.innerHTML = `<div class="empty"><span class="big">📋</span>${state.collected.length ? "No collected stickers match." : "Nothing collected yet. Tap “Got it” on a sticker when you find it."}</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="dupe-total">Tap ↩ if you marked one by mistake.</div>` +
+    [...list].reverse().map(s => stickerCard(s,
+      `<button class="btn btn-undo btn-sm" onclick="uncollect('${s.c}')">↩ Back to missing</button>`)).join("");
+}
+
+function renderChips(){
+  const bar = $("#chipBar");
+  if (view !== "missing"){ bar.style.display = "none"; return; }
+  bar.style.display = "flex";
+  const remaining = missingList();
+  const counts = {};
+  for (const s of remaining) counts[s.t] = (counts[s.t] || 0) + 1;
+  let html = `<button class="chip ${countryFilter==="ALL"?"active":""}" onclick="setCountry('ALL')">All <span class="n">${remaining.length}</span></button>`;
+  for (const t of COUNTRY_ORDER){
+    if (!counts[t]) continue;
+    html += `<button class="chip ${countryFilter===t?"active":""}" onclick="setCountry('${esc(t).replace(/'/g,"\\'")}')">${esc(t)} <span class="n">${counts[t]}</span></button>`;
+  }
+  bar.innerHTML = html;
+}
+function setCountry(t){ countryFilter = t; render(); }
+
+function renderKeepMsg(){
+  // re-render but preserve dupe input focus/message (used after adding dupes)
+  const msg = $("#dupeMsg") ? $("#dupeMsg").outerHTML : null;
+  const val = $("#dupeInput") ? $("#dupeInput").value : "";
+  render();
+  if (view === "dupes" && msg){
+    $("#dupeMsg").outerHTML = msg;
+    $("#dupeInput").value = val;
+  }
+}
+
+function render(){
+  const missing = missingList().length;
+  const collected = state.collected.length;
+  const totalDupes = Object.values(state.dupes).reduce((a,b)=>a+b,0);
+  $("#progressLabel").textContent = `${collected} of ${STICKERS.length} found · ${missing} missing`;
+  $("#progressBar").style.width = (collected / STICKERS.length * 100) + "%";
+  $("#cntMissing").textContent = `(${missing})`;
+  $("#cntDupes").textContent = `(${totalDupes})`;
+  $("#cntCollected").textContent = `(${collected})`;
+  document.querySelectorAll(".view-tabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.view === view));
+  renderChips();
+  const el = $("#content");
+  if (view === "missing") renderMissing(el);
+  else if (view === "dupes") renderDupes(el);
+  else renderCollected(el);
+  $("#searchClear").style.display = query ? "block" : "none";
+}
+
+// ---- Events ----
+document.querySelectorAll(".view-tabs button").forEach(b =>
+  b.addEventListener("click", () => { view = b.dataset.view; render(); }));
+$("#search").addEventListener("input", e => { query = e.target.value; render(); });
+$("#searchClear").addEventListener("click", () => {
+  query = ""; $("#search").value = ""; render(); $("#search").focus();
+});
+
+render();
+</script>
+</body>
+</html>
